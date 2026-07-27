@@ -107,7 +107,7 @@ class ScaleLinearCompuMethod(CompuMethod):
             # reference point must be identical
             y0 = s0.convert_internal_to_physical(x)
             y1 = s1.convert_internal_to_physical(x)
-            if abs(y0 - y1) < 1e-10:
+            if abs(y0 - y1) > 1e-10:
                 self._is_invertible = False
                 break
 
