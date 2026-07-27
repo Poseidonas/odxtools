@@ -670,7 +670,7 @@ class HierarchyElement(DiagLayer):
         if not isinstance(val, str):
             return None
 
-        return int(val)
+        return int(val, 0)
 
     def get_can_fd_baudrate(self, protocol: Union[str, "Protocol"] | None = None) -> int | None:
         """Data baudrate of the CAN bus which is used by the ECU [bits/s]
@@ -689,7 +689,7 @@ class HierarchyElement(DiagLayer):
         if not isinstance(val, str):
             return None
 
-        return int(val)
+        return int(val, 0)
 
     def get_can_receive_id(self, protocol: Union[str, "Protocol"] | None = None) -> int | None:
         """CAN ID to which the ECU listens for diagnostic messages"""
@@ -708,7 +708,7 @@ class HierarchyElement(DiagLayer):
             return None
         odxassert(isinstance(result, str))
 
-        return int(result)
+        return int(result, 0)
 
     def get_can_send_id(self, protocol: Union[str, "Protocol"] | None = None) -> int | None:
         """CAN ID to which the ECU sends replies to diagnostic messages"""
@@ -733,7 +733,7 @@ class HierarchyElement(DiagLayer):
             return None
         odxassert(isinstance(result, str))
 
-        return int(result)
+        return int(result, 0)
 
     def get_can_func_req_id(self, protocol: Union[str, "Protocol"] | None = None) -> int | None:
         """CAN Functional Request Id."""
@@ -746,7 +746,7 @@ class HierarchyElement(DiagLayer):
             return None
         odxassert(isinstance(result, str))
 
-        return int(result)
+        return int(result, 0)
 
     def get_doip_logical_ecu_address(self,
                                      protocol: Union[str, "Protocol"] | None = None) -> int | None:
@@ -777,7 +777,7 @@ class HierarchyElement(DiagLayer):
             ecu_addr = com_param.get_subvalue("CP_DoIPLogicalEcuAddress")
         if ecu_addr is None:
             return None
-        return int(ecu_addr)
+        return int(ecu_addr, 0)
 
     def get_doip_logical_gateway_address(self,
                                          protocol: Union[str, "Protocol"] | None = None
@@ -795,7 +795,7 @@ class HierarchyElement(DiagLayer):
             return None
         odxassert(isinstance(result, str))
 
-        return int(result)
+        return int(result, 0)
 
     def get_doip_logical_tester_address(self,
                                         protocol: Union[str, "Protocol"] | None = None
@@ -813,7 +813,7 @@ class HierarchyElement(DiagLayer):
             return None
         odxassert(isinstance(result, str))
 
-        return int(result)
+        return int(result, 0)
 
     def get_doip_logical_functional_address(self,
                                             protocol: Union[str, "Protocol"] | None = None
@@ -834,7 +834,7 @@ class HierarchyElement(DiagLayer):
             return None
         odxassert(isinstance(result, str))
 
-        return int(result)
+        return int(result, 0)
 
     def get_doip_routing_activation_timeout(self,
                                             protocol: Union[str, "Protocol"] | None = None
@@ -878,7 +878,7 @@ class HierarchyElement(DiagLayer):
             return None
         odxassert(isinstance(result, str))
 
-        return int(result)
+        return int(result, 0)
 
     def get_tester_present_time(self,
                                 protocol: Union[str, "Protocol"] | None = None) -> float | None:
