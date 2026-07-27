@@ -178,7 +178,7 @@ class DtcDop(DopBase):
         if not found:
             odxraise(
                 f"Unknown diagnostic trouble code {physical_value!r} "
-                f"(0x{internal_trouble_code: 06x}) specified", EncodeError)
+                f"(0x{internal_trouble_code:06x}) specified", EncodeError)
 
         self.diag_coded_type.encode_into_pdu(internal_trouble_code, encode_state)
 
