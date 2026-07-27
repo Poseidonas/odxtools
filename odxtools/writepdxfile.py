@@ -46,7 +46,7 @@ def set_layer_docfrag(jinja_vars: dict[str, Any], layer_short_name: str | None) 
     cur_docfrags = jinja_vars["cur_docfrags"]
 
     if layer_short_name is None:
-        cur_docfrags = cur_docfrags[:1]
+        jinja_vars["cur_docfrags"] = cur_docfrags[:1]
         return ""
 
     if len(cur_docfrags) == 1:
