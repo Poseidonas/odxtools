@@ -1,4 +1,6 @@
 # SPDX-License-Identifier: MIT
+import math
+
 from dataclasses import dataclass
 from typing import cast
 from xml.etree import ElementTree
@@ -107,7 +109,7 @@ class ScaleLinearCompuMethod(CompuMethod):
             # reference point must be identical
             y0 = s0.convert_internal_to_physical(x)
             y1 = s1.convert_internal_to_physical(x)
-            if abs(y0 - y1) < 1e-10:
+            if not math.isclose(y0, y1):
                 self._is_invertible = False
                 break
 

@@ -6,7 +6,7 @@ from xml.etree import ElementTree
 from .addressing import Addressing
 from .comparaminstance import ComparamInstance
 from .diagcomm import DiagComm
-from .exceptions import DecodeError, DecodeMismatch, odxassert, odxraise, odxrequire
+from .exceptions import DecodeError, DecodeMismatch, EncodeError, odxassert, odxraise, odxrequire
 from .message import Message
 from .nameditemlist import NamedItemList
 from .odxdoccontext import OdxDocContext
@@ -238,14 +238,15 @@ class DiagService(DiagComm):
         missing_params = {x.short_name
                           for x in self.request.required_parameters}.difference(kwargs.keys())
         odxassert(
-            len(missing_params) == 0, f"The parameters {missing_params} are required but missing!")
+            len(missing_params) == 0, f"The parameters {missing_params} are required but missing!",
+            EncodeError)
 
         # make sure that no unknown parameters are specified
         rq_all_param_names = {x.short_name for x in self.request.parameters}
         odxassert(
             set(kwargs.keys()).issubset(rq_all_param_names),
             f"Unknown parameters specified for encoding: {kwargs.keys()}, "
-            f"known parameters are: {rq_all_param_names}")
+            f"known parameters are: {rq_all_param_names}", EncodeError)
         return self.request.encode(**kwargs)
 
     def encode_positive_response(self,

@@ -165,7 +165,6 @@ class TableStructParameter(Parameter):
         # find the selected table row
         key_name = self.table_key.short_name
 
-        decode_state.table_keys[key_name]
         table_row = decode_state.table_keys.get(key_name)
         if table_row is None:
             odxraise(

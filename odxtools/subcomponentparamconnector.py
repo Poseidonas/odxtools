@@ -50,8 +50,12 @@ class SubComponentParamConnector(IdentifiableElement):
         diag_comm_snref = odxrequire(
             odxrequire(et_element.find("DIAG-COMM-SNREF")).get("SHORT-NAME"))
 
+        if (tmp := et_element.find("OUT-PARAM-IF-REFS")) is not None:
+            out_param_if_ref_elems: list[ElementTree.Element] | ElementTree.Element = tmp
+        else:
+            out_param_if_ref_elems = []
         out_param_if_refs = []
-        for elem in et_element.find("OUT-PARAM-IF-REFS") or []:
+        for elem in out_param_if_ref_elems:
             if elem.tag != "OUT-PARAM-IF-SNREF":
                 odxraise("Currently, only SNREFS are supported for OUT-PARAM-IF-REFS")
                 continue
@@ -59,8 +63,12 @@ class SubComponentParamConnector(IdentifiableElement):
                 odxassert(elem.tag == "OUT-PARAM-IF-SNREF")
                 out_param_if_refs.append(odxrequire(elem.attrib.get("SHORT-NAME")))
 
+        if (tmp := et_element.find("IN-PARAM-IF-REFS")) is not None:
+            in_param_if_ref_elems: list[ElementTree.Element] | ElementTree.Element = tmp
+        else:
+            in_param_if_ref_elems = []
         in_param_if_refs = []
-        for elem in et_element.find("IN-PARAM-IF-REFS") or []:
+        for elem in in_param_if_ref_elems:
             if elem.tag != "IN-PARAM-IF-SNREF":
                 odxraise("Currently, only SNREFS are supported for IN-PARAM-IF-REFS")
                 continue

@@ -46,7 +46,7 @@ def set_layer_docfrag(jinja_vars: dict[str, Any], layer_short_name: str | None) 
     cur_docfrags = jinja_vars["cur_docfrags"]
 
     if layer_short_name is None:
-        cur_docfrags = cur_docfrags[:1]
+        jinja_vars["cur_docfrags"] = cur_docfrags[:1]
         return ""
 
     if len(cur_docfrags) == 1:
@@ -201,18 +201,18 @@ def write_pdx_file(
         # write the multiple ECU jobs specs
         multiple_ecu_jobs_spec_tpl = jinja_env.get_template(
             "multiple-ecu-job-spec.odx-m.xml.jinja2")
-        for multiple_ecu_jobs_spec in database.multiple_ecu_job_specs:
-            zf_file_name = f"{multiple_ecu_jobs_spec.short_name}.odx-m"
+        for multiple_ecu_job_spec in database.multiple_ecu_job_specs:
+            zf_file_name = f"{multiple_ecu_job_spec.short_name}.odx-m"
             zf_file_cdate = datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
             zf_mime_type = "application/x-asam.odx.odx-m"
 
-            jinja_vars["multiple_ecu_jobs_spec"] = multiple_ecu_jobs_spec
+            jinja_vars["multiple_ecu_job_spec"] = multiple_ecu_job_spec
 
             file_index.append((zf_file_name, zf_file_cdate, zf_mime_type))
 
             zf.writestr(zf_file_name, multiple_ecu_jobs_spec_tpl.render(**jinja_vars))
 
-            del jinja_vars["multiple_ecu_jobs_spec"]
+            del jinja_vars["multiple_ecu_job_spec"]
 
         # write the communication parameter specs
         comparam_spec_tpl = jinja_env.get_template("comparam-spec.odx-c.xml.jinja2")

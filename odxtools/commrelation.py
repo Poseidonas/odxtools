@@ -29,7 +29,7 @@ class CommRelation:
 
     @property
     def diag_comm(self) -> DiagComm:
-        return self._diag_comm
+        return odxrequire(self._diag_comm)
 
     @property
     def in_param_if(self) -> Parameter | None:
@@ -90,6 +90,7 @@ class CommRelation:
         return {}
 
     def _resolve_odxlinks(self, odxlinks: OdxLinkDatabase) -> None:
+        self._diag_comm = None
         if self.diag_comm_ref is not None:
             self._diag_comm = odxlinks.resolve(self.diag_comm_ref, DiagComm)
 
@@ -102,6 +103,10 @@ class CommRelation:
                 diag_layer.diag_comms,
                 DiagComm,
                 use_weakrefs=context.use_weakrefs)
+
+        if self._diag_comm is None:
+            odxraise("No DIAG-COMM referenced by COMM-RELATION")
+            return
 
         service = self.diag_comm
         if not isinstance(service, DiagService):
@@ -119,8 +124,11 @@ class CommRelation:
 
         self._out_param_if = None
         if self.out_param_if_snref is not None:
+            first_response = service.positive_responses[0] if service.positive_responses else None
             self._out_param_if = resolve_snref(
                 self.out_param_if_snref,
-                odxrequire(service.positive_responses[0]).parameters,
+                odxrequire(
+                    first_response,
+                    f"DIAG-SERVICE '{service.short_name}' has no positive responses").parameters,
                 Parameter,
                 use_weakrefs=context.use_weakrefs)

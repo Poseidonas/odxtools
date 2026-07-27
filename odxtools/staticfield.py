@@ -95,12 +95,12 @@ class StaticField(Field):
         for _ in range(self.fixed_number_of_items):
             orig_cursor = decode_state.cursor_byte_position
 
+            result.append(self.structure.decode_from_pdu(decode_state))
+
             if decode_state.cursor_byte_position - orig_cursor > self.item_byte_size:
                 odxraise(f"Insufficient item byte size for static field {self.short_name}: "
                          f"Is {self.item_byte_size} bytes, but need at least "
                          f"{decode_state.cursor_byte_position - orig_cursor} bytes")
-
-            result.append(self.structure.decode_from_pdu(decode_state))
 
             decode_state.cursor_byte_position = orig_cursor + self.item_byte_size
 
