@@ -131,17 +131,18 @@ class StateMachine:
             self.succeeded = False
             return
 
-        # the service can be executed if any of the specified
-        # precondition states is fulfilled. (TODO: correct?)
-        if service.pre_condition_state_refs is not None:
-            if not any(
-                    x.applies(self, service.request.parameters, service_params)
-                    for x in service.pre_condition_state_refs):
-                # if all preconditions which are applicable are
-                # invalid (i.e., they evaluate to False), we must not
-                # execute the service.
-                self.succeeded = False
-                return
+        # If the service specifies precondition states, it can only be
+        # executed if at least one of the specified states applies. If
+        # it does not specify preconditions, it can always be
+        # executed.
+        if len(service.pre_condition_state_refs) > 0 and not any(
+                x.applies(self, service.request.parameters, service_params)
+                for x in service.pre_condition_state_refs):
+            # if all preconditions which are applicable are
+            # invalid (i.e., they evaluate to False), we must not
+            # execute the service.
+            self.succeeded = False
+            return
 
         raw_req = service.request.encode(**service_params)
         # ask the calling code to send the request to the ECU and
