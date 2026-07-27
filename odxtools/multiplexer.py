@@ -247,7 +247,13 @@ class Multiplexer(ComplexDop):
         the codec length is considered static and is returned.
         Otherwise, returns None to indicate that the size is dynamic.
         """
-        reference_case = self.default_case if self.default_case else self.cases[0]
+        reference_case: MultiplexerCase | MultiplexerDefaultCase
+        if self.default_case is not None:
+            reference_case = self.default_case
+        elif self.cases:
+            reference_case = self.cases[0]
+        else:
+            return None
 
         case_bit_length: int | None
         if reference_case.structure is None:
