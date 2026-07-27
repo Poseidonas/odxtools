@@ -29,7 +29,7 @@ class CommRelation:
 
     @property
     def diag_comm(self) -> DiagComm:
-        return self._diag_comm
+        return odxrequire(self._diag_comm)
 
     @property
     def in_param_if(self) -> Parameter | None:
@@ -90,6 +90,7 @@ class CommRelation:
         return {}
 
     def _resolve_odxlinks(self, odxlinks: OdxLinkDatabase) -> None:
+        self._diag_comm = None
         if self.diag_comm_ref is not None:
             self._diag_comm = odxlinks.resolve(self.diag_comm_ref, DiagComm)
 
@@ -103,8 +104,8 @@ class CommRelation:
                 DiagComm,
                 use_weakrefs=context.use_weakrefs)
 
-        if not hasattr(self, "_diag_comm"):
-            odxraise("COMM-RELATION does not reference a diagnostic communication object")
+        if self._diag_comm is None:
+            odxraise("No DIAG-COMM referenced by COMM-RELATION")
             return
 
         service = self.diag_comm
