@@ -258,7 +258,7 @@ def parameter_info(param_list: Iterable[Parameter], quoted_names: bool = False) 
             elif isinstance(cm, ScaleRatFuncCompuMethod):
                 of.write(f"{q}{param.short_name}{q}: {dop.physical_type.base_data_type}")
                 if cm._phys_to_int_segments is None:
-                    of.write("<NOT ENCODABLE>")
+                    of.write("<NOT ENCODABLE>\n")
                 else:
                     seg_list = [_get_rat_func_segment_info(x) for x in cm._phys_to_int_segments]
                     of.write(f"; ranges = {{ {', '.join(seg_list)} }}")
