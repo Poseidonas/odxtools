@@ -103,6 +103,10 @@ class CommRelation:
                 DiagComm,
                 use_weakrefs=context.use_weakrefs)
 
+        if not hasattr(self, "_diag_comm"):
+            odxraise("COMM-RELATION does not reference a diagnostic communication object")
+            return
+
         service = self.diag_comm
         if not isinstance(service, DiagService):
             odxraise(f"DIAG-VARIABLE references non-service {type(service).__name__} "
@@ -119,8 +123,11 @@ class CommRelation:
 
         self._out_param_if = None
         if self.out_param_if_snref is not None:
+            first_response = service.positive_responses[0] if service.positive_responses else None
             self._out_param_if = resolve_snref(
                 self.out_param_if_snref,
-                odxrequire(service.positive_responses[0]).parameters,
+                odxrequire(
+                    first_response,
+                    f"DIAG-SERVICE '{service.short_name}' has no positive responses").parameters,
                 Parameter,
                 use_weakrefs=context.use_weakrefs)
