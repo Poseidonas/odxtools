@@ -15,6 +15,7 @@ import odxtools
 from .database import Database
 from .odxlink import DocType, OdxDocFragment, OdxLinkRef
 from .odxtypes import bool_to_odxstr
+from functools import cache
 
 
 def jinja2_odxraise_helper(msg: str) -> None:
@@ -71,6 +72,18 @@ def make_ref_attribs(jinja_vars: dict[str, Any], ref: OdxLinkRef) -> str:
 __module_filename = inspect.getsourcefile(odxtools)
 assert isinstance(__module_filename, str)
 __templates_dir = os.path.sep.join([os.path.dirname(__module_filename), "templates"])
+
+
+@cache
+def _get_jinja_env(templates_dir: str) -> jinja2.Environment:
+    """Return a cached Jinja2 environment for the given templates directory."""
+    env = jinja2.Environment(loader=jinja2.FileSystemLoader(templates_dir))
+    env.globals["getattr"] = getattr
+    env.globals["hasattr"] = hasattr
+    env.globals["odxraise"] = jinja2_odxraise_helper
+    env.globals["make_xml_attrib"] = make_xml_attrib
+    env.globals["make_bool_xml_attrib"] = make_bool_xml_attrib
+    return env
 
 
 def write_pdx_file(
@@ -153,13 +166,7 @@ def write_pdx_file(
                 file_index.append((zf_name, creation_date, mime_type))
                 out_file.write(data_file.read())
 
-        jinja_env = jinja2.Environment(loader=jinja2.FileSystemLoader(templates_dir))
-        jinja_env.globals["getattr"] = getattr
-        jinja_env.globals["hasattr"] = hasattr
-        jinja_env.globals["odxraise"] = jinja2_odxraise_helper
-        jinja_env.globals["make_xml_attrib"] = make_xml_attrib
-        jinja_env.globals["make_bool_xml_attrib"] = make_bool_xml_attrib
-
+        jinja_env = _get_jinja_env(templates_dir)
         jinja_vars: dict[str, Any] = {}
         jinja_vars["odxtools_version"] = odxtools.__version__
         jinja_vars["database"] = database
