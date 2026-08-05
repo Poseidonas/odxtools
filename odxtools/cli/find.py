@@ -31,8 +31,8 @@ def print_summary(odxdb: Database,
     service_db: dict[str, DiagService] = {}
     service_ecus: dict[str, list[str]] = {}
     for ecu_name in ecu_names:
-        ecu = odxdb.ecus[ecu_name]
-        if not ecu:
+        ecu = odxdb.diag_layers.get(ecu_name)
+        if ecu is None:
             print(f"The ecu variant [green3]'{ecu_name}'[/green3] could not be found!")
             continue
 
