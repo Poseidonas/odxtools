@@ -16,12 +16,31 @@ if TYPE_CHECKING:
 class DecodeState:
     """Utility class to be used while decoding a message."""
 
+    #: bytes to be decoded
     coded_message: bytes | bytearray
+    #: Absolute position of the origin
+    #:
+    #: i.e., the absolute byte position to which all relative positions
+    #: refer to, e.g. the position of the first byte of a structure.
     origin_byte_position: int = 0
+    #: Absolute position of the next undecoded byte to be considered
+    #:
+    #: (if not explicitly specified by the object to be decoded.)
     cursor_byte_position: int = 0
+    #: the bit position [0, 7] where the object to be extracted begins
+    #:
+    #: If bit position is undefined (`None`), the object to be extracted
+    #: starts at bit 0.
     cursor_bit_position: int = 0
+    #: values of the length key parameters decoded so far
     length_keys: dict[str, int] = field(default_factory=dict)
+
+    #: values of the table key parameters decoded so far
     table_keys: dict[str, "TableRow"] = field(default_factory=dict)
+
+    #: List of parameters that have been decoded so far. The journal
+    #: is used by some types of parameters which depend on the values of
+    #: other parameters; i.e., environment data description parameters
     journal: list[tuple["Parameter", ParameterValue | None]] = field(default_factory=list)
 
     def extract_atomic_value(
@@ -32,7 +51,14 @@ class DecodeState:
         base_type_encoding: Encoding | None,
         is_highlow_byte_order: bool,
     ) -> AtomicOdxType:
-        """Extract an internal value from a blob of raw bytes."""
+        """
+        Extract an internal value from a blob of raw bytes.
+
+        :return: Tuple with the internal value of the object and the
+                 byte position of the first undecoded byte after the
+                 extracted object.
+        """
+        # If the bit length is zero, return "empty" values of each type
         if bit_length == 0:
             return base_data_type.python_type()
 
@@ -49,6 +75,11 @@ class DecodeState:
         extracted_bytes = self.coded_message[self.cursor_byte_position:self.cursor_byte_position +
                                              byte_length]
 
+        # Apply byteorder for numerical objects. Note that doing this
+        # here might lead to garbage data being included in the result
+        # if the data to be extracted is not byte aligned and crosses
+        # byte boundaries, but it is what the specification says.
+
         if not is_highlow_byte_order and base_data_type in [
                 DataType.A_INT32,
                 DataType.A_UINT32,
@@ -57,7 +88,7 @@ class DecodeState:
         ]:
             extracted_bytes = extracted_bytes[::-1]
 
-        # === NATIVE BIT-SHIFTING DECODE ===
+        # native bit-shifting decode
         tmp = int.from_bytes(extracted_bytes, "big")
         tmp >>= self.cursor_bit_position
         raw_value = tmp & ((1 << bit_length) - 1)
@@ -68,47 +99,57 @@ class DecodeState:
             raw_value = struct.unpack(">d", raw_value.to_bytes(8, "big"))[0]
         elif base_data_type == DataType.A_BYTEFIELD:
             byte_len = (bit_length + 7) // 8
-            raw_value = raw_value.to_bytes(byte_len, "big")
-        elif base_data_type in (DataType.A_ASCIISTRING, DataType.A_UTF8STRING, DataType.A_UNICODE2STRING):
+            raw_bytes = raw_value.to_bytes(byte_len, "big")
+        elif base_data_type in (DataType.A_ASCIISTRING, DataType.A_UTF8STRING,
+                                DataType.A_UNICODE2STRING):
             byte_len = (bit_length + 7) // 8
-            raw_value = raw_value.to_bytes(byte_len, "big")
+            raw_bytes = raw_value.to_bytes(byte_len, "big")
 
         internal_value: AtomicOdxType
 
+        # Deal with raw byte fields, ...
         if base_data_type == DataType.A_BYTEFIELD:
             odxassert(
                 base_type_encoding in (None, Encoding.NONE, Encoding.BCD_P, Encoding.BCD_UP),
                 f"Illegal encoding '{base_type_encoding}' for A_BYTEFIELD")
-            internal_value = raw_value
+            # note that we do not ensure that BCD-encoded byte fields
+            # only represent "legal" values
+            internal_value = raw_bytes
 
+            # ... string types, ...
         elif base_data_type in (DataType.A_UTF8STRING, DataType.A_ASCIISTRING,
                                 DataType.A_UNICODE2STRING):
             text_errors = 'strict' if strict_mode else 'replace'
             str_encoding = get_string_encoding(base_data_type, base_type_encoding,
                                                is_highlow_byte_order)
             if str_encoding is not None:
-                if not isinstance(raw_value, (bytes, bytearray)):
-                    odxraise(f"Expected bytes for string decoding, got {type(raw_value).__name__}")
-                internal_value = raw_value.decode(str_encoding, errors=text_errors)
+                if not isinstance(raw_bytes, (bytes, bytearray)):
+                    odxraise(f"Expected bytes for string decoding, got {type(raw_bytes).__name__}")
+                internal_value = raw_bytes.decode(str_encoding, errors=text_errors)
             else:
                 internal_value = "ERROR"
-
+            # ... signed integers, ...
         elif base_data_type == DataType.A_INT32:
             if not isinstance(raw_value, int):
                 odxraise(f"Expected integer raw value for A_INT32, got {type(raw_value).__name__}")
             if base_type_encoding == Encoding.ONEC:
+                # one-complement
                 sign_bit = 1 << (bit_length - 1)
                 if raw_value < sign_bit:
                     internal_value = raw_value
                 else:
+                    # python defines the bitwise inversion of a
+                    # positive integer value x as ~x = -(x + 1).
                     internal_value = -((1 << bit_length) - raw_value - 1)
             elif base_type_encoding in (None, Encoding.TWOC):
+                # two-complement
                 sign_bit = 1 << (bit_length - 1)
                 if raw_value < sign_bit:
                     internal_value = raw_value
                 else:
                     internal_value = -((1 << bit_length) - raw_value)
             elif base_type_encoding == Encoding.SM:
+                # sign-magnitude
                 sign_bit = 1 << (bit_length - 1)
                 if raw_value < sign_bit:
                     internal_value = raw_value
@@ -124,6 +165,7 @@ class DecodeState:
                 else:
                     internal_value = raw_value
 
+                # ... unsigned integers, ...
         elif base_data_type == DataType.A_UINT32:
             if not isinstance(raw_value, int):
                 odxraise(f"Expected integer raw value for A_UINT32, got {type(raw_value).__name__}")
@@ -131,13 +173,15 @@ class DecodeState:
                 internal_value = self.__decode_bcd_p(raw_value)
             elif base_type_encoding == Encoding.BCD_UP:
                 internal_value = self.__decode_bcd_up(raw_value)
+                # no encoding
             elif base_type_encoding in (None, Encoding.NONE):
                 internal_value = raw_value
+
             else:
                 odxraise(f"Illegal encoding ({base_type_encoding}) specified for "
                          f"{base_data_type.value}")
                 internal_value = raw_value
-
+            # ... and others (floating point values)
         else:
             odxassert(base_data_type in (DataType.A_FLOAT32, DataType.A_FLOAT64))
             odxassert(
@@ -152,6 +196,7 @@ class DecodeState:
 
     @staticmethod
     def __decode_bcd_p(value: int) -> int:
+        # packed BCD
         result = 0
         factor = 1
         while value > 0:
@@ -162,6 +207,7 @@ class DecodeState:
 
     @staticmethod
     def __decode_bcd_up(value: int) -> int:
+        # unpacked BCD
         result = 0
         factor = 1
         while value > 0:
