@@ -90,6 +90,7 @@ class EncodeState:
         """Convert the internal_value to bytes and emplace this into the PDU"""
 
         raw_value: AtomicOdxType
+        # Deal with raw byte fields, ...
         if base_data_type == DataType.A_BYTEFIELD:
             if not isinstance(internal_value, BytesTypes):
                 odxraise(f"{internal_value!r} is not a bytefield", EncodeError)
@@ -105,7 +106,6 @@ class EncodeState:
                     f"The value '{internal_value!r}' cannot be encoded using "
                     f"{bit_length} bits.", EncodeError)
                 raw_value = raw_value[0:bit_length // 8]
-
         # ... string types, ...
         elif base_data_type in (DataType.A_UTF8STRING, DataType.A_ASCIISTRING,
                                 DataType.A_UNICODE2STRING):
@@ -219,7 +219,6 @@ class EncodeState:
             self.emplace_bytes(b'')
             return
 
-        # === NATIVE BIT-SHIFTING ENCODE ===
         total_bits = self.cursor_bit_position + bit_length
         byte_length = (total_bits + 7) // 8
 

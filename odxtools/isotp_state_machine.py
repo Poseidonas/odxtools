@@ -60,9 +60,7 @@ class IsoTpStateMachine:
 
         telegram_len = None
         if frame_type == IsoTp.FRAME_TYPE_SINGLE:
-            frame_type = data[0] >> 4
             telegram_len = data[0] & 0x0F
-            assert isinstance(telegram_len, int)
 
             self.on_single_frame(telegram_idx, data[1:1 + telegram_len])
             self.on_telegram_complete(telegram_idx, data[1:1 + telegram_len])
@@ -70,9 +68,7 @@ class IsoTpStateMachine:
             yield (rx_id, bytes(data[1:1 + telegram_len]))
 
         elif frame_type == IsoTp.FRAME_TYPE_FIRST:
-            frame_type = data[0] >> 4
             telegram_len = ((data[0] & 0x0F) << 8) | data[1]
-            assert isinstance(telegram_len, int)
 
             self._telegram_specified_len[telegram_idx] = telegram_len
             self._telegram_data[telegram_idx] = bytearray(data[2:])
@@ -81,13 +77,14 @@ class IsoTpStateMachine:
             self.on_first_frame(telegram_idx, data)
 
         elif frame_type == IsoTp.FRAME_TYPE_CONSECUTIVE:
-            frame_type = data[0] >> 4
             rx_segment_idx = data[0] & 0x0F
-            assert isinstance(rx_segment_idx, int)
 
             expected_segment_idx = (self._telegram_last_rx_fragment_idx[telegram_idx] + 1) % 16
             telegram_data = self._telegram_data[telegram_idx]
-            assert isinstance(telegram_data, bytearray)
+            if telegram_data is None:
+                # consecutive frame received before first frame
+                self.on_sequence_error(telegram_idx, expected_segment_idx, rx_segment_idx)
+                return
 
             n = -1
             if expected_segment_idx == rx_segment_idx:
@@ -110,9 +107,7 @@ class IsoTpStateMachine:
                 yield (rx_id, bytes(telegram_data))
 
         elif frame_type == IsoTp.FRAME_TYPE_FLOW_CONTROL:
-            frame_type = data[0] >> 4
             flow_control_flag = data[0] & 0x0F
-            assert isinstance(flow_control_flag, int)
 
             self.on_flow_control_frame(telegram_idx, flow_control_flag)
         else:

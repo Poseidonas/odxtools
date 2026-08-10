@@ -88,14 +88,15 @@ class DecodeState:
         ]:
             extracted_bytes = extracted_bytes[::-1]
 
-        # native bit-shifting decode
         tmp = int.from_bytes(extracted_bytes, "big")
         tmp >>= self.cursor_bit_position
         raw_value = tmp & ((1 << bit_length) - 1)
 
         if base_data_type == DataType.A_FLOAT32:
+            odxassert(bit_length == 32, "A_FLOAT32 requires bit_length=32")
             raw_value = struct.unpack(">f", raw_value.to_bytes(4, "big"))[0]
         elif base_data_type == DataType.A_FLOAT64:
+            odxassert(bit_length == 64, "A_FLOAT64 requires bit_length=64")
             raw_value = struct.unpack(">d", raw_value.to_bytes(8, "big"))[0]
         elif base_data_type == DataType.A_BYTEFIELD:
             byte_len = (bit_length + 7) // 8
@@ -116,7 +117,7 @@ class DecodeState:
             # only represent "legal" values
             internal_value = raw_bytes
 
-            # ... string types, ...
+        # ... string types, ...
         elif base_data_type in (DataType.A_UTF8STRING, DataType.A_ASCIISTRING,
                                 DataType.A_UNICODE2STRING):
             text_errors = 'strict' if strict_mode else 'replace'
@@ -128,7 +129,7 @@ class DecodeState:
                 internal_value = raw_bytes.decode(str_encoding, errors=text_errors)
             else:
                 internal_value = "ERROR"
-            # ... signed integers, ...
+        # ... signed integers, ...
         elif base_data_type == DataType.A_INT32:
             if not isinstance(raw_value, int):
                 odxraise(f"Expected integer raw value for A_INT32, got {type(raw_value).__name__}")
@@ -165,7 +166,7 @@ class DecodeState:
                 else:
                     internal_value = raw_value
 
-                # ... unsigned integers, ...
+        # ... unsigned integers, ...
         elif base_data_type == DataType.A_UINT32:
             if not isinstance(raw_value, int):
                 odxraise(f"Expected integer raw value for A_UINT32, got {type(raw_value).__name__}")
@@ -173,7 +174,7 @@ class DecodeState:
                 internal_value = self.__decode_bcd_p(raw_value)
             elif base_type_encoding == Encoding.BCD_UP:
                 internal_value = self.__decode_bcd_up(raw_value)
-                # no encoding
+            # no encoding
             elif base_type_encoding in (None, Encoding.NONE):
                 internal_value = raw_value
 
@@ -181,7 +182,7 @@ class DecodeState:
                 odxraise(f"Illegal encoding ({base_type_encoding}) specified for "
                          f"{base_data_type.value}")
                 internal_value = raw_value
-            # ... and others (floating point values)
+        # ... and others (floating point values)
         else:
             odxassert(base_data_type in (DataType.A_FLOAT32, DataType.A_FLOAT64))
             odxassert(
