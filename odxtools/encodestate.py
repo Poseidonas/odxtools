@@ -285,7 +285,7 @@ class EncodeState:
         # apply byte order to numeric objects
         if not is_highlow_byte_order and base_data_type in [
                 DataType.A_INT32, DataType.A_UINT32, DataType.A_FLOAT32, DataType.A_FLOAT64
-        ] and bit_length % 8 == 0:
+        ]:
             coded = coded[::-1]
             used_mask_raw = used_mask_raw[::-1]
 

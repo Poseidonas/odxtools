@@ -85,7 +85,7 @@ class DecodeState:
                 DataType.A_UINT32,
                 DataType.A_FLOAT32,
                 DataType.A_FLOAT64,
-        ] and bit_length % 8 == 0:
+        ]:
             extracted_bytes = extracted_bytes[::-1]
 
         tmp = int.from_bytes(extracted_bytes, "big")
@@ -93,10 +93,12 @@ class DecodeState:
         raw_value = tmp & ((1 << bit_length) - 1)
 
         if base_data_type == DataType.A_FLOAT32:
-            odxassert(bit_length == 32, "A_FLOAT32 requires bit_length=32")
+            if bit_length != 32:
+                raise DecodeError("The bit length of A_FLOAT32 values must be 32 bits")
             raw_value = struct.unpack(">f", raw_value.to_bytes(4, "big"))[0]
         elif base_data_type == DataType.A_FLOAT64:
-            odxassert(bit_length == 64, "A_FLOAT64 requires bit_length=64")
+            if bit_length != 64:
+                raise DecodeError("The bit length of A_FLOAT64 values must be 64 bits")
             raw_value = struct.unpack(">d", raw_value.to_bytes(8, "big"))[0]
         elif base_data_type == DataType.A_BYTEFIELD:
             byte_len = (bit_length + 7) // 8
