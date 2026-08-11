@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from .encoding import Encoding, get_string_encoding
 from .exceptions import EncodeError, OdxWarning, odxassert, odxraise
 from .odxtypes import AtomicOdxType, BytesTypes, DataType, ParameterValue
+from typing import Literal
 
 if TYPE_CHECKING:
     from .parameters.parameter import Parameter
@@ -221,33 +222,34 @@ class EncodeState:
 
         total_bits = self.cursor_bit_position + bit_length
         byte_length = (total_bits + 7) // 8
+        byteorder: Literal["big", "little"] = "big" if is_highlow_byte_order else "little"
 
         if base_data_type in (DataType.A_UINT32, DataType.A_INT32):
             if isinstance(raw_value, int):
                 masked = raw_value & ((1 << bit_length) - 1)
                 shifted = masked << self.cursor_bit_position
-                coded = shifted.to_bytes(byte_length, "big")
+                coded = shifted.to_bytes(byte_length, byteorder)
             else:
                 odxraise(f"Expected integer, got {type(raw_value).__name__}", EncodeError)
                 coded = b"\x00" * byte_length
 
         elif base_data_type == DataType.A_FLOAT32:
-            float_bytes = struct.pack(">f", float(raw_value))
-            float_val = int.from_bytes(float_bytes, "big")
+            float_bytes = struct.pack(">f" if is_highlow_byte_order else "<f", float(raw_value))
+            float_val = int.from_bytes(float_bytes, byteorder)
             shifted = float_val << self.cursor_bit_position
-            coded = shifted.to_bytes(byte_length, "big")
+            coded = shifted.to_bytes(byte_length, byteorder)
 
         elif base_data_type == DataType.A_FLOAT64:
-            float_bytes = struct.pack(">d", float(raw_value))
-            float_val = int.from_bytes(float_bytes, "big")
+            float_bytes = struct.pack(">d" if is_highlow_byte_order else "<d", float(raw_value))
+            float_val = int.from_bytes(float_bytes, byteorder)
             shifted = float_val << self.cursor_bit_position
-            coded = shifted.to_bytes(byte_length, "big")
+            coded = shifted.to_bytes(byte_length, byteorder)
 
         elif base_data_type == DataType.A_BYTEFIELD:
             if isinstance(raw_value, (bytes, bytearray)):
-                raw_int = int.from_bytes(raw_value, "big")
+                raw_int = int.from_bytes(raw_value, byteorder)
                 shifted = raw_int << self.cursor_bit_position
-                coded = shifted.to_bytes(byte_length, "big")
+                coded = shifted.to_bytes(byte_length, byteorder)
             else:
                 odxraise(f"Expected bytes, got {type(raw_value).__name__}", EncodeError)
                 coded = b"\x00" * byte_length
@@ -262,9 +264,9 @@ class EncodeState:
                 else:
                     raw_value = raw_value.encode("utf-16-be")
             if isinstance(raw_value, (bytes, bytearray)):
-                raw_int = int.from_bytes(raw_value, "big")
+                raw_int = int.from_bytes(raw_value, byteorder)
                 shifted = raw_int << self.cursor_bit_position
-                coded = shifted.to_bytes(byte_length, "big")
+                coded = shifted.to_bytes(byte_length, byteorder)
             else:
                 odxraise(f"Expected bytes, got {type(raw_value).__name__}", EncodeError)
                 coded = b"\x00" * byte_length
@@ -276,19 +278,13 @@ class EncodeState:
         # Create used mask
         used_mask_raw = used_mask
         if used_mask_raw is None:
-            used_mask_raw = ((1 << bit_length) - 1).to_bytes((bit_length + 7) // 8, "big")
+            used_mask_raw = ((1 << bit_length) - 1).to_bytes((bit_length + 7) // 8, byteorder)
 
         if self.cursor_bit_position != 0:
-            tmp = int.from_bytes(used_mask_raw, "big")
+            tmp = int.from_bytes(used_mask_raw, byteorder)
             tmp <<= self.cursor_bit_position
-            used_mask_raw = tmp.to_bytes((self.cursor_bit_position + bit_length + 7) // 8, "big")
-        # apply byte order to numeric objects
-        if not is_highlow_byte_order and base_data_type in [
-                DataType.A_INT32, DataType.A_UINT32, DataType.A_FLOAT32, DataType.A_FLOAT64
-        ]:
-            coded = coded[::-1]
-            used_mask_raw = used_mask_raw[::-1]
-
+            used_mask_raw = tmp.to_bytes((self.cursor_bit_position + bit_length + 7) // 8,
+                                         byteorder)
         self.cursor_bit_position = 0
         self.emplace_bytes(coded, obj_used_mask=used_mask_raw)
 

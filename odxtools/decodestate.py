@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 from .encoding import Encoding, get_string_encoding
 from .exceptions import DecodeError, odxassert, odxraise, strict_mode
 from .odxtypes import AtomicOdxType, DataType, ParameterValue
+from typing import Literal
 
 if TYPE_CHECKING:
     from .parameters.parameter import Parameter
@@ -80,33 +81,29 @@ class DecodeState:
         # if the data to be extracted is not byte aligned and crosses
         # byte boundaries, but it is what the specification says.
 
-        if not is_highlow_byte_order and base_data_type in [
-                DataType.A_INT32,
-                DataType.A_UINT32,
-                DataType.A_FLOAT32,
-                DataType.A_FLOAT64,
-        ]:
-            extracted_bytes = extracted_bytes[::-1]
+        byteorder: Literal["big", "little"] = "big" if is_highlow_byte_order else "little"
 
-        tmp = int.from_bytes(extracted_bytes, "big")
+        tmp = int.from_bytes(extracted_bytes, byteorder)
         tmp >>= self.cursor_bit_position
         raw_value = tmp & ((1 << bit_length) - 1)
 
         if base_data_type == DataType.A_FLOAT32:
             if bit_length != 32:
                 raise DecodeError("The bit length of A_FLOAT32 values must be 32 bits")
-            raw_value = struct.unpack(">f", raw_value.to_bytes(4, "big"))[0]
+            raw_value = struct.unpack(">f" if is_highlow_byte_order else "<f",
+                                      raw_value.to_bytes(4, byteorder))[0]
         elif base_data_type == DataType.A_FLOAT64:
             if bit_length != 64:
                 raise DecodeError("The bit length of A_FLOAT64 values must be 64 bits")
-            raw_value = struct.unpack(">d", raw_value.to_bytes(8, "big"))[0]
+            raw_value = struct.unpack(">d" if is_highlow_byte_order else "<d",
+                                      raw_value.to_bytes(8, byteorder))[0]
         elif base_data_type == DataType.A_BYTEFIELD:
             byte_len = (bit_length + 7) // 8
-            raw_bytes = raw_value.to_bytes(byte_len, "big")
+            raw_bytes = raw_value.to_bytes(byte_len, byteorder)
         elif base_data_type in (DataType.A_ASCIISTRING, DataType.A_UTF8STRING,
                                 DataType.A_UNICODE2STRING):
             byte_len = (bit_length + 7) // 8
-            raw_bytes = raw_value.to_bytes(byte_len, "big")
+            raw_bytes = raw_value.to_bytes(byte_len, byteorder)
 
         internal_value: AtomicOdxType
 
