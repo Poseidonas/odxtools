@@ -85,7 +85,7 @@ class DecodeState:
                 DataType.A_UINT32,
                 DataType.A_FLOAT32,
                 DataType.A_FLOAT64,
-        ]:
+        ] and bit_length % 8 == 0:
             extracted_bytes = extracted_bytes[::-1]
 
         tmp = int.from_bytes(extracted_bytes, "big")
