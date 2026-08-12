@@ -74,13 +74,16 @@ class DecodeState:
 
         byte_length = (bit_length + self.cursor_bit_position + 7) // 8
         if self.cursor_byte_position + byte_length > len(self.coded_message):
-            raise DecodeError(f"Expected a longer message.")
+            odxraise(
+                f"Expected at message size of at least {self.cursor_byte_position + byte_length}"
+                f" bytes (is {len(self.coded_message)} bytes).", DecodeError)
+            return None
         extracted_bytes = self.coded_message[self.cursor_byte_position:self.cursor_byte_position +
                                              byte_length]
 
         # Apply byteorder for numerical objects. Note that doing this
         # here might lead to garbage data being included in the result
-        # if the data to be extracted is not byte aligned and crosses
+        # if the data to be extracted is not byte-aligned and crosses
         # byte boundaries, but it is what the specification says.
         if not is_highlow_byte_order and base_data_type in [
                 DataType.A_INT32,
@@ -90,17 +93,29 @@ class DecodeState:
         ]:
             extracted_bytes = extracted_bytes[::-1]
 
+        # Deal with the bit position. Note that we have already dealt
+        # with the byte order above (as described by the ODX standard
+        # in section 7.3.6.3), so we always extract big endian
+        # integers here
         tmp = int.from_bytes(extracted_bytes, "big")
         tmp >>= self.cursor_bit_position
         raw_value = tmp & ((1 << bit_length) - 1)
 
         if base_data_type == DataType.A_FLOAT32:
             if bit_length != 32:
-                raise DecodeError("The bit length of A_FLOAT32 values must be 32 bits")
+                odxraise("The bit length of A_FLOAT32 values must be 32 bits", DecodeError)
+                self.cursor_byte_position += (bit_length + 7) // 8
+                self.cursor_bit_position = 0
+                return None
+
             raw_value = struct.unpack(">f", raw_value.to_bytes(4, "big"))[0]
         elif base_data_type == DataType.A_FLOAT64:
             if bit_length != 64:
-                raise DecodeError("The bit length of A_FLOAT64 values must be 64 bits")
+                odxraise("The bit length of A_FLOAT64 values must be 64 bits", DecodeError)
+                self.cursor_byte_position += (bit_length + 7) // 8
+                self.cursor_bit_position = 0
+                return None
+
             raw_value = struct.unpack(">d", raw_value.to_bytes(8, "big"))[0]
         elif base_data_type == DataType.A_BYTEFIELD:
             byte_len = (bit_length + 7) // 8

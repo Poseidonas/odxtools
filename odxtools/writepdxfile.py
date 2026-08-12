@@ -6,6 +6,7 @@ import mimetypes
 import os
 import time
 import zipfile
+from functools import cache
 from typing import Any
 
 import jinja2
@@ -15,7 +16,6 @@ import odxtools
 from .database import Database
 from .odxlink import DocType, OdxDocFragment, OdxLinkRef
 from .odxtypes import bool_to_odxstr
-from functools import cache
 
 
 def jinja2_odxraise_helper(msg: str) -> None:

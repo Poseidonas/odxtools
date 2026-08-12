@@ -216,11 +216,20 @@ class EncodeState:
             odxassert(base_type_encoding in (None, Encoding.NONE))
 
             if base_data_type == DataType.A_FLOAT32 and bit_length != 32:
-                odxraise(f"Illegal bit length for a float32 object ({bit_length})")
-                bit_length = 32
+                odxraise(f"Illegal bit length for a float32 object ({bit_length})", EncodeError)
+                total_bits = self.cursor_bit_position + bit_length
+                byte_length = (total_bits + 7) // 8
+                self.cursor_bit_position = 0
+                self.emplace_bytes(b'\x00' * byte_length)
+                return
             elif base_data_type == DataType.A_FLOAT64 and bit_length != 64:
-                odxraise(f"Illegal bit length for a float64 object ({bit_length})")
-                bit_length = 64
+                odxraise(f"Illegal bit length for a float64 object ({bit_length})", EncodeError)
+                total_bits = self.cursor_bit_position + bit_length
+                byte_length = (total_bits + 7) // 8
+                self.cursor_bit_position = 0
+                self.emplace_bytes(b'\x00' * byte_length)
+                return
+
             if isinstance(internal_value, (int, float)):
                 raw_value = float(internal_value)
             else:
@@ -236,6 +245,10 @@ class EncodeState:
         total_bits = self.cursor_bit_position + bit_length
         byte_length = (total_bits + 7) // 8
 
+        # convert the internal value to bytes. Note that we deal
+        # with the byte order below (as described by the ODX standard
+        # in section 7.3.6.4), so we always pack as if we had
+        # big-endian objects
         if base_data_type in (DataType.A_UINT32, DataType.A_INT32):
             if isinstance(raw_value, int):
                 masked = raw_value & ((1 << bit_length) - 1)
