@@ -103,6 +103,7 @@ class EncodeState:
 
             # note that we do not ensure that BCD-encoded byte fields
             # only represent "legal" values
+
             raw_value = bytes(internal_value)
 
             if 8 * len(raw_value) > bit_length:

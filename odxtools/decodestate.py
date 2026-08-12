@@ -132,6 +132,7 @@ class DecodeState:
             odxassert(
                 base_type_encoding in (None, Encoding.NONE, Encoding.BCD_P, Encoding.BCD_UP),
                 f"Illegal encoding '{base_type_encoding}' for A_BYTEFIELD")
+
             # note that we do not ensure that BCD-encoded byte fields
             # only represent "legal" values
             internal_value = raw_bytes
@@ -186,7 +187,6 @@ class DecodeState:
                     internal_value = self.__decode_bcd_up(raw_value)
                 else:
                     internal_value = raw_value
-
         # ... unsigned integers, ...
         elif base_data_type == DataType.A_UINT32:
             if not isinstance(raw_value, int):
@@ -202,6 +202,7 @@ class DecodeState:
             else:
                 odxraise(f"Illegal encoding ({base_type_encoding}) specified for "
                          f"{base_data_type.value}")
+
                 internal_value = raw_value
 
         # ... and others (floating point values)
