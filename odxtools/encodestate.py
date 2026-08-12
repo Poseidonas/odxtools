@@ -90,34 +90,41 @@ class EncodeState:
         """Convert the internal_value to bytes and emplace this into the PDU"""
 
         raw_value: AtomicOdxType
+
         # Deal with raw byte fields, ...
         if base_data_type == DataType.A_BYTEFIELD:
             if not isinstance(internal_value, BytesTypes):
                 odxraise(f"{internal_value!r} is not a bytefield", EncodeError)
                 return
+
             odxassert(
                 base_type_encoding in (None, Encoding.NONE, Encoding.BCD_P, Encoding.BCD_UP),
                 f"Illegal encoding '{base_type_encoding}' for A_BYTEFIELD")
+
             # note that we do not ensure that BCD-encoded byte fields
             # only represent "legal" values
             raw_value = bytes(internal_value)
+
             if 8 * len(raw_value) > bit_length:
                 odxraise(
                     f"The value '{internal_value!r}' cannot be encoded using "
                     f"{bit_length} bits.", EncodeError)
                 raw_value = raw_value[0:bit_length // 8]
+
         # ... string types, ...
         elif base_data_type in (DataType.A_UTF8STRING, DataType.A_ASCIISTRING,
                                 DataType.A_UNICODE2STRING):
             if not isinstance(internal_value, str):
                 odxraise(f"The internal value '{internal_value!r}' is not a string", EncodeError)
                 internal_value = str(internal_value)
+
             str_encoding = get_string_encoding(base_data_type, base_type_encoding,
                                                is_highlow_byte_order)
             if str_encoding is not None:
                 raw_value = internal_value.encode(str_encoding)
             else:
                 raw_value = b""
+
             if 8 * len(raw_value) > bit_length:
                 odxraise(
                     f"The value '{internal_value!r}' cannot be encoded using "
@@ -131,6 +138,7 @@ class EncodeState:
                     f"Internal value must be of integer type, not {type(internal_value).__name__}",
                     EncodeError)
                 internal_value = int(internal_value)
+
             if base_type_encoding == Encoding.ONEC:
                 # one-complement
                 if internal_value >= 0:
@@ -155,12 +163,14 @@ class EncodeState:
                 odxraise(
                     f"Illegal encoding ({base_type_encoding and base_type_encoding.value}) specified for "
                     f"{base_data_type.value}")
+
                 if base_type_encoding == Encoding.BCD_P:
                     raw_value = self.__encode_bcd_p(abs(internal_value))
                 elif base_type_encoding == Encoding.BCD_UP:
                     raw_value = self.__encode_bcd_up(abs(internal_value))
                 else:
                     raw_value = internal_value
+
             if not isinstance(raw_value, int):
                 odxraise(f"Expected integer raw value for A_INT32, got {type(raw_value).__name__}",
                          EncodeError)
@@ -175,6 +185,7 @@ class EncodeState:
             if not isinstance(internal_value, int) or internal_value < 0:
                 odxraise(f"Internal value must be a positive integer, not {internal_value!r}")
                 internal_value = abs(int(internal_value))
+
             if base_type_encoding == Encoding.BCD_P:
                 # packed BCD
                 raw_value = self.__encode_bcd_p(internal_value)
@@ -187,7 +198,9 @@ class EncodeState:
             else:
                 odxraise(f"Illegal encoding ({base_type_encoding}) specified for "
                          f"{base_data_type.value}")
+
                 raw_value = internal_value
+
             if not isinstance(raw_value, int):
                 odxraise(f"Expected integer raw value for A_UINT32, got {type(raw_value).__name__}",
                          EncodeError)
@@ -201,6 +214,7 @@ class EncodeState:
         else:
             odxassert(base_data_type in (DataType.A_FLOAT32, DataType.A_FLOAT64))
             odxassert(base_type_encoding in (None, Encoding.NONE))
+
             if base_data_type == DataType.A_FLOAT32 and bit_length != 32:
                 odxraise(f"Illegal bit length for a float32 object ({bit_length})")
                 bit_length = 32
@@ -275,6 +289,7 @@ class EncodeState:
 
         # Create used mask
         used_mask_raw = used_mask
+
         if used_mask_raw is None:
             used_mask_raw = ((1 << bit_length) - 1).to_bytes((bit_length + 7) // 8, "big")
 
@@ -282,6 +297,7 @@ class EncodeState:
             tmp = int.from_bytes(used_mask_raw, "big")
             tmp <<= self.cursor_bit_position
             used_mask_raw = tmp.to_bytes((self.cursor_bit_position + bit_length + 7) // 8, "big")
+
         # apply byte order to numeric objects
         if not is_highlow_byte_order and base_data_type in [
                 DataType.A_INT32, DataType.A_UINT32, DataType.A_FLOAT32, DataType.A_FLOAT64
@@ -299,6 +315,7 @@ class EncodeState:
         if self.cursor_bit_position != 0:
             odxraise("EncodeState.emplace_bytes can only be called "
                      "for a bit position of 0!", RuntimeError)
+
         pos = self.cursor_byte_position
 
         # Make blob longer if necessary
@@ -349,6 +366,7 @@ class EncodeState:
             result |= (value % 10) << shift
             shift += 4
             value //= 10
+
         return result
 
     @staticmethod
@@ -359,4 +377,5 @@ class EncodeState:
             result |= (value % 10) << shift
             shift += 8
             value //= 10
+
         return result
