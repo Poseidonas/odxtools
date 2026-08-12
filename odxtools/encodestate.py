@@ -96,6 +96,7 @@ class EncodeState:
             if not isinstance(internal_value, BytesTypes):
                 odxraise(f"{internal_value!r} is not a bytefield", EncodeError)
                 return
+
             odxassert(
                 base_type_encoding in (None, Encoding.NONE, Encoding.BCD_P, Encoding.BCD_UP),
                 f"Illegal encoding '{base_type_encoding}' for A_BYTEFIELD")
@@ -104,6 +105,7 @@ class EncodeState:
             # only represent "legal" values
 
             raw_value = bytes(internal_value)
+
             if 8 * len(raw_value) > bit_length:
                 odxraise(
                     f"The value '{internal_value!r}' cannot be encoded using "
@@ -184,6 +186,7 @@ class EncodeState:
             if not isinstance(internal_value, int) or internal_value < 0:
                 odxraise(f"Internal value must be a positive integer, not {internal_value!r}")
                 internal_value = abs(int(internal_value))
+
             if base_type_encoding == Encoding.BCD_P:
                 # packed BCD
                 raw_value = self.__encode_bcd_p(internal_value)
@@ -196,6 +199,7 @@ class EncodeState:
             else:
                 odxraise(f"Illegal encoding ({base_type_encoding}) specified for "
                          f"{base_data_type.value}")
+
                 raw_value = internal_value
 
             if not isinstance(raw_value, int):
@@ -211,12 +215,22 @@ class EncodeState:
         else:
             odxassert(base_data_type in (DataType.A_FLOAT32, DataType.A_FLOAT64))
             odxassert(base_type_encoding in (None, Encoding.NONE))
+
             if base_data_type == DataType.A_FLOAT32 and bit_length != 32:
-                odxraise(f"Illegal bit length for a float32 object ({bit_length})")
-                bit_length = 32
+                odxraise(f"Illegal bit length for a float32 object ({bit_length})", EncodeError)
+                total_bits = self.cursor_bit_position + bit_length
+                byte_length = (total_bits + 7) // 8
+                self.cursor_bit_position = 0
+                self.emplace_bytes(b'\x00' * byte_length)
+                return
             elif base_data_type == DataType.A_FLOAT64 and bit_length != 64:
-                odxraise(f"Illegal bit length for a float64 object ({bit_length})")
-                bit_length = 64
+                odxraise(f"Illegal bit length for a float64 object ({bit_length})", EncodeError)
+                total_bits = self.cursor_bit_position + bit_length
+                byte_length = (total_bits + 7) // 8
+                self.cursor_bit_position = 0
+                self.emplace_bytes(b'\x00' * byte_length)
+                return
+
             if isinstance(internal_value, (int, float)):
                 raw_value = float(internal_value)
             else:
@@ -232,6 +246,10 @@ class EncodeState:
         total_bits = self.cursor_bit_position + bit_length
         byte_length = (total_bits + 7) // 8
 
+        # convert the internal value to bytes. Note that we deal
+        # with the byte order below (as described by the ODX standard
+        # in section 7.3.6.4), so we always pack as if we had
+        # big-endian objects
         if base_data_type in (DataType.A_UINT32, DataType.A_INT32):
             if isinstance(raw_value, int):
                 masked = raw_value & ((1 << bit_length) - 1)
@@ -242,10 +260,16 @@ class EncodeState:
                 coded = b"\x00" * byte_length
 
         elif base_data_type == DataType.A_FLOAT32:
-            coded = struct.pack(">f" if is_highlow_byte_order else "<f", float(raw_value))
+            float_bytes = struct.pack(">f", float(raw_value))
+            float_val = int.from_bytes(float_bytes, "big")
+            shifted = float_val << self.cursor_bit_position
+            coded = shifted.to_bytes(byte_length, "big")
 
         elif base_data_type == DataType.A_FLOAT64:
-            coded = struct.pack(">d" if is_highlow_byte_order else "<d", float(raw_value))
+            float_bytes = struct.pack(">d", float(raw_value))
+            float_val = int.from_bytes(float_bytes, "big")
+            shifted = float_val << self.cursor_bit_position
+            coded = shifted.to_bytes(byte_length, "big")
 
         elif base_data_type == DataType.A_BYTEFIELD:
             if isinstance(raw_value, (bytes, bytearray)):
@@ -279,6 +303,7 @@ class EncodeState:
 
         # Create used mask
         used_mask_raw = used_mask
+
         if used_mask_raw is None:
             used_mask_raw = ((1 << bit_length) - 1).to_bytes((bit_length + 7) // 8, "big")
 
@@ -287,9 +312,9 @@ class EncodeState:
             tmp <<= self.cursor_bit_position
             used_mask_raw = tmp.to_bytes((self.cursor_bit_position + bit_length + 7) // 8, "big")
 
+        # apply byte order to numeric objects
         if not is_highlow_byte_order and base_data_type in [
-                DataType.A_INT32,
-                DataType.A_UINT32,
+                DataType.A_INT32, DataType.A_UINT32, DataType.A_FLOAT32, DataType.A_FLOAT64
         ]:
             coded = coded[::-1]
             used_mask_raw = used_mask_raw[::-1]
@@ -304,6 +329,7 @@ class EncodeState:
         if self.cursor_bit_position != 0:
             odxraise("EncodeState.emplace_bytes can only be called "
                      "for a bit position of 0!", RuntimeError)
+
         pos = self.cursor_byte_position
 
         # Make blob longer if necessary
