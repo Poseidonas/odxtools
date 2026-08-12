@@ -1,6 +1,5 @@
 # SPDX-License-Identifier: MIT
 import math
-
 from dataclasses import dataclass
 from typing import cast
 from xml.etree import ElementTree

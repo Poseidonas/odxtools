@@ -1,4 +1,5 @@
 # SPDX-License-Identifier: MIT
+import struct
 import warnings
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -6,11 +7,6 @@ from typing import TYPE_CHECKING
 from .encoding import Encoding, get_string_encoding
 from .exceptions import EncodeError, OdxWarning, odxassert, odxraise
 from .odxtypes import AtomicOdxType, BytesTypes, DataType, ParameterValue
-
-try:
-    import bitstruct.c as bitstruct
-except ImportError:
-    import bitstruct
 
 if TYPE_CHECKING:
     from .parameters.parameter import Parameter
@@ -107,6 +103,7 @@ class EncodeState:
 
             # note that we do not ensure that BCD-encoded byte fields
             # only represent "legal" values
+
             raw_value = bytes(internal_value)
 
             if 8 * len(raw_value) > bit_length:
@@ -220,30 +217,91 @@ class EncodeState:
             odxassert(base_type_encoding in (None, Encoding.NONE))
 
             if base_data_type == DataType.A_FLOAT32 and bit_length != 32:
-                odxraise(f"Illegal bit length for a float32 object ({bit_length})")
-                bit_length = 32
+                odxraise(f"Illegal bit length for a float32 object ({bit_length})", EncodeError)
+                total_bits = self.cursor_bit_position + bit_length
+                byte_length = (total_bits + 7) // 8
+                self.cursor_bit_position = 0
+                self.emplace_bytes(b'\x00' * byte_length)
+                return
             elif base_data_type == DataType.A_FLOAT64 and bit_length != 64:
-                odxraise(f"Illegal bit length for a float64 object ({bit_length})")
-                bit_length = 64
+                odxraise(f"Illegal bit length for a float64 object ({bit_length})", EncodeError)
+                total_bits = self.cursor_bit_position + bit_length
+                byte_length = (total_bits + 7) // 8
+                self.cursor_bit_position = 0
+                self.emplace_bytes(b'\x00' * byte_length)
+                return
 
-            raw_value = float(internal_value)  # type: ignore[arg-type]
+            if isinstance(internal_value, (int, float)):
+                raw_value = float(internal_value)
+            else:
+                odxraise(f"Expected numeric value for float, got {type(internal_value).__name__}",
+                         EncodeError)
+                raw_value = 0.0
 
         # If the bit length is zero, encode an empty value
         if bit_length == 0:
             self.emplace_bytes(b'')
             return
 
-        format_char = base_data_type.bitstruct_format_letter
-        padding = (8 - ((bit_length + self.cursor_bit_position) % 8)) % 8
-        odxassert((0 <= padding and padding < 8 and
-                   (padding + bit_length + self.cursor_bit_position) % 8 == 0),
-                  f"Incorrect padding {padding}")
-        left_pad = f"p{padding}" if padding > 0 else ""
+        total_bits = self.cursor_bit_position + bit_length
+        byte_length = (total_bits + 7) // 8
 
-        # actually encode the value
-        coded = bitstruct.pack(f"{left_pad}{format_char}{bit_length}", raw_value)
+        # convert the internal value to bytes. Note that we deal
+        # with the byte order below (as described by the ODX standard
+        # in section 7.3.6.4), so we always pack as if we had
+        # big-endian objects
+        if base_data_type in (DataType.A_UINT32, DataType.A_INT32):
+            if isinstance(raw_value, int):
+                masked = raw_value & ((1 << bit_length) - 1)
+                shifted = masked << self.cursor_bit_position
+                coded = shifted.to_bytes(byte_length, "big")
+            else:
+                odxraise(f"Expected integer, got {type(raw_value).__name__}", EncodeError)
+                coded = b"\x00" * byte_length
 
-        # create the raw mask of used bits for numeric objects
+        elif base_data_type == DataType.A_FLOAT32:
+            float_bytes = struct.pack(">f", float(raw_value))
+            float_val = int.from_bytes(float_bytes, "big")
+            shifted = float_val << self.cursor_bit_position
+            coded = shifted.to_bytes(byte_length, "big")
+
+        elif base_data_type == DataType.A_FLOAT64:
+            float_bytes = struct.pack(">d", float(raw_value))
+            float_val = int.from_bytes(float_bytes, "big")
+            shifted = float_val << self.cursor_bit_position
+            coded = shifted.to_bytes(byte_length, "big")
+
+        elif base_data_type == DataType.A_BYTEFIELD:
+            if isinstance(raw_value, (bytes, bytearray)):
+                raw_int = int.from_bytes(raw_value, "big")
+                shifted = raw_int << self.cursor_bit_position
+                coded = shifted.to_bytes(byte_length, "big")
+            else:
+                odxraise(f"Expected bytes, got {type(raw_value).__name__}", EncodeError)
+                coded = b"\x00" * byte_length
+
+        elif base_data_type in (DataType.A_ASCIISTRING, DataType.A_UTF8STRING,
+                                DataType.A_UNICODE2STRING):
+            if isinstance(raw_value, str):
+                if base_data_type == DataType.A_ASCIISTRING:
+                    raw_value = raw_value.encode("ascii")
+                elif base_data_type == DataType.A_UTF8STRING:
+                    raw_value = raw_value.encode("utf-8")
+                else:
+                    raw_value = raw_value.encode("utf-16-be")
+            if isinstance(raw_value, (bytes, bytearray)):
+                raw_int = int.from_bytes(raw_value, "big")
+                shifted = raw_int << self.cursor_bit_position
+                coded = shifted.to_bytes(byte_length, "big")
+            else:
+                odxraise(f"Expected bytes, got {type(raw_value).__name__}", EncodeError)
+                coded = b"\x00" * byte_length
+
+        else:
+            odxraise(f"Unsupported base data type: {base_data_type}", EncodeError)
+            coded = b"\x00" * byte_length
+
+        # Create used mask
         used_mask_raw = used_mask
 
         if used_mask_raw is None:
