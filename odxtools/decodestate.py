@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 from .encoding import Encoding, get_string_encoding
 from .exceptions import DecodeError, odxassert, odxraise, strict_mode
 from .odxtypes import AtomicOdxType, DataType, ParameterValue
-from typing import Literal
 
 if TYPE_CHECKING:
     from .parameters.parameter import Parameter
@@ -19,20 +18,24 @@ class DecodeState:
 
     #: bytes to be decoded
     coded_message: bytes | bytearray
+
     #: Absolute position of the origin
     #:
     #: i.e., the absolute byte position to which all relative positions
     #: refer to, e.g. the position of the first byte of a structure.
     origin_byte_position: int = 0
+
     #: Absolute position of the next undecoded byte to be considered
     #:
     #: (if not explicitly specified by the object to be decoded.)
     cursor_byte_position: int = 0
+
     #: the bit position [0, 7] where the object to be extracted begins
     #:
     #: If bit position is undefined (`None`), the object to be extracted
     #: starts at bit 0.
     cursor_bit_position: int = 0
+
     #: values of the length key parameters decoded so far
     length_keys: dict[str, int] = field(default_factory=dict)
 
@@ -81,9 +84,13 @@ class DecodeState:
         # if the data to be extracted is not byte aligned and crosses
         # byte boundaries, but it is what the specification says.
 
-        byteorder: Literal["big", "little"] = "big" if is_highlow_byte_order else "little"
+        if not is_highlow_byte_order and base_data_type in [
+                DataType.A_INT32,
+                DataType.A_UINT32,
+        ]:
+            extracted_bytes = extracted_bytes[::-1]
 
-        tmp = int.from_bytes(extracted_bytes, byteorder)
+        tmp = int.from_bytes(extracted_bytes, "big")
         tmp >>= self.cursor_bit_position
         raw_value = tmp & ((1 << bit_length) - 1)
 
@@ -91,19 +98,19 @@ class DecodeState:
             if bit_length != 32:
                 raise DecodeError("The bit length of A_FLOAT32 values must be 32 bits")
             raw_value = struct.unpack(">f" if is_highlow_byte_order else "<f",
-                                      raw_value.to_bytes(4, byteorder))[0]
+                                      raw_value.to_bytes(4, "big"))[0]
         elif base_data_type == DataType.A_FLOAT64:
             if bit_length != 64:
                 raise DecodeError("The bit length of A_FLOAT64 values must be 64 bits")
             raw_value = struct.unpack(">d" if is_highlow_byte_order else "<d",
-                                      raw_value.to_bytes(8, byteorder))[0]
+                                      raw_value.to_bytes(8, "big"))[0]
         elif base_data_type == DataType.A_BYTEFIELD:
             byte_len = (bit_length + 7) // 8
-            raw_bytes = raw_value.to_bytes(byte_len, byteorder)
+            raw_bytes = raw_value.to_bytes(byte_len, "big")
         elif base_data_type in (DataType.A_ASCIISTRING, DataType.A_UTF8STRING,
                                 DataType.A_UNICODE2STRING):
             byte_len = (bit_length + 7) // 8
-            raw_bytes = raw_value.to_bytes(byte_len, byteorder)
+            raw_bytes = raw_value.to_bytes(byte_len, "big")
 
         internal_value: AtomicOdxType
 
@@ -112,6 +119,7 @@ class DecodeState:
             odxassert(
                 base_type_encoding in (None, Encoding.NONE, Encoding.BCD_P, Encoding.BCD_UP),
                 f"Illegal encoding '{base_type_encoding}' for A_BYTEFIELD")
+
             # note that we do not ensure that BCD-encoded byte fields
             # only represent "legal" values
             internal_value = raw_bytes
@@ -128,6 +136,7 @@ class DecodeState:
                 internal_value = raw_bytes.decode(str_encoding, errors=text_errors)
             else:
                 internal_value = "ERROR"
+
         # ... signed integers, ...
         elif base_data_type == DataType.A_INT32:
             if not isinstance(raw_value, int):
@@ -158,13 +167,13 @@ class DecodeState:
             else:
                 odxraise(f"Illegal encoding ({base_type_encoding}) specified for "
                          f"{base_data_type.value}")
+
                 if base_type_encoding == Encoding.BCD_P:
                     internal_value = self.__decode_bcd_p(raw_value)
                 elif base_type_encoding == Encoding.BCD_UP:
                     internal_value = self.__decode_bcd_up(raw_value)
                 else:
                     internal_value = raw_value
-
         # ... unsigned integers, ...
         elif base_data_type == DataType.A_UINT32:
             if not isinstance(raw_value, int):
@@ -180,7 +189,9 @@ class DecodeState:
             else:
                 odxraise(f"Illegal encoding ({base_type_encoding}) specified for "
                          f"{base_data_type.value}")
+
                 internal_value = raw_value
+
         # ... and others (floating point values)
         else:
             odxassert(base_data_type in (DataType.A_FLOAT32, DataType.A_FLOAT64))
@@ -203,6 +214,7 @@ class DecodeState:
             result += (value & 0xf) * factor
             factor *= 10
             value >>= 4
+
         return result
 
     @staticmethod
@@ -214,4 +226,5 @@ class DecodeState:
             result += (value & 0xf) * factor
             factor *= 10
             value >>= 8
+
         return result

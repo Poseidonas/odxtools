@@ -7,7 +7,6 @@ from typing import TYPE_CHECKING
 from .encoding import Encoding, get_string_encoding
 from .exceptions import EncodeError, OdxWarning, odxassert, odxraise
 from .odxtypes import AtomicOdxType, BytesTypes, DataType, ParameterValue
-from typing import Literal
 
 if TYPE_CHECKING:
     from .parameters.parameter import Parameter
@@ -91,6 +90,7 @@ class EncodeState:
         """Convert the internal_value to bytes and emplace this into the PDU"""
 
         raw_value: AtomicOdxType
+
         # Deal with raw byte fields, ...
         if base_data_type == DataType.A_BYTEFIELD:
             if not isinstance(internal_value, BytesTypes):
@@ -99,26 +99,31 @@ class EncodeState:
             odxassert(
                 base_type_encoding in (None, Encoding.NONE, Encoding.BCD_P, Encoding.BCD_UP),
                 f"Illegal encoding '{base_type_encoding}' for A_BYTEFIELD")
+
             # note that we do not ensure that BCD-encoded byte fields
             # only represent "legal" values
+
             raw_value = bytes(internal_value)
             if 8 * len(raw_value) > bit_length:
                 odxraise(
                     f"The value '{internal_value!r}' cannot be encoded using "
                     f"{bit_length} bits.", EncodeError)
                 raw_value = raw_value[0:bit_length // 8]
+
         # ... string types, ...
         elif base_data_type in (DataType.A_UTF8STRING, DataType.A_ASCIISTRING,
                                 DataType.A_UNICODE2STRING):
             if not isinstance(internal_value, str):
                 odxraise(f"The internal value '{internal_value!r}' is not a string", EncodeError)
                 internal_value = str(internal_value)
+
             str_encoding = get_string_encoding(base_data_type, base_type_encoding,
                                                is_highlow_byte_order)
             if str_encoding is not None:
                 raw_value = internal_value.encode(str_encoding)
             else:
                 raw_value = b""
+
             if 8 * len(raw_value) > bit_length:
                 odxraise(
                     f"The value '{internal_value!r}' cannot be encoded using "
@@ -132,6 +137,7 @@ class EncodeState:
                     f"Internal value must be of integer type, not {type(internal_value).__name__}",
                     EncodeError)
                 internal_value = int(internal_value)
+
             if base_type_encoding == Encoding.ONEC:
                 # one-complement
                 if internal_value >= 0:
@@ -156,12 +162,14 @@ class EncodeState:
                 odxraise(
                     f"Illegal encoding ({base_type_encoding and base_type_encoding.value}) specified for "
                     f"{base_data_type.value}")
+
                 if base_type_encoding == Encoding.BCD_P:
                     raw_value = self.__encode_bcd_p(abs(internal_value))
                 elif base_type_encoding == Encoding.BCD_UP:
                     raw_value = self.__encode_bcd_up(abs(internal_value))
                 else:
                     raw_value = internal_value
+
             if not isinstance(raw_value, int):
                 odxraise(f"Expected integer raw value for A_INT32, got {type(raw_value).__name__}",
                          EncodeError)
@@ -189,6 +197,7 @@ class EncodeState:
                 odxraise(f"Illegal encoding ({base_type_encoding}) specified for "
                          f"{base_data_type.value}")
                 raw_value = internal_value
+
             if not isinstance(raw_value, int):
                 odxraise(f"Expected integer raw value for A_UINT32, got {type(raw_value).__name__}",
                          EncodeError)
@@ -222,34 +231,27 @@ class EncodeState:
 
         total_bits = self.cursor_bit_position + bit_length
         byte_length = (total_bits + 7) // 8
-        byteorder: Literal["big", "little"] = "big" if is_highlow_byte_order else "little"
 
         if base_data_type in (DataType.A_UINT32, DataType.A_INT32):
             if isinstance(raw_value, int):
                 masked = raw_value & ((1 << bit_length) - 1)
                 shifted = masked << self.cursor_bit_position
-                coded = shifted.to_bytes(byte_length, byteorder)
+                coded = shifted.to_bytes(byte_length, "big")
             else:
                 odxraise(f"Expected integer, got {type(raw_value).__name__}", EncodeError)
                 coded = b"\x00" * byte_length
 
         elif base_data_type == DataType.A_FLOAT32:
-            float_bytes = struct.pack(">f" if is_highlow_byte_order else "<f", float(raw_value))
-            float_val = int.from_bytes(float_bytes, byteorder)
-            shifted = float_val << self.cursor_bit_position
-            coded = shifted.to_bytes(byte_length, byteorder)
+            coded = struct.pack(">f" if is_highlow_byte_order else "<f", float(raw_value))
 
         elif base_data_type == DataType.A_FLOAT64:
-            float_bytes = struct.pack(">d" if is_highlow_byte_order else "<d", float(raw_value))
-            float_val = int.from_bytes(float_bytes, byteorder)
-            shifted = float_val << self.cursor_bit_position
-            coded = shifted.to_bytes(byte_length, byteorder)
+            coded = struct.pack(">d" if is_highlow_byte_order else "<d", float(raw_value))
 
         elif base_data_type == DataType.A_BYTEFIELD:
             if isinstance(raw_value, (bytes, bytearray)):
-                raw_int = int.from_bytes(raw_value, byteorder)
+                raw_int = int.from_bytes(raw_value, "big")
                 shifted = raw_int << self.cursor_bit_position
-                coded = shifted.to_bytes(byte_length, byteorder)
+                coded = shifted.to_bytes(byte_length, "big")
             else:
                 odxraise(f"Expected bytes, got {type(raw_value).__name__}", EncodeError)
                 coded = b"\x00" * byte_length
@@ -264,9 +266,9 @@ class EncodeState:
                 else:
                     raw_value = raw_value.encode("utf-16-be")
             if isinstance(raw_value, (bytes, bytearray)):
-                raw_int = int.from_bytes(raw_value, byteorder)
+                raw_int = int.from_bytes(raw_value, "big")
                 shifted = raw_int << self.cursor_bit_position
-                coded = shifted.to_bytes(byte_length, byteorder)
+                coded = shifted.to_bytes(byte_length, "big")
             else:
                 odxraise(f"Expected bytes, got {type(raw_value).__name__}", EncodeError)
                 coded = b"\x00" * byte_length
@@ -278,13 +280,20 @@ class EncodeState:
         # Create used mask
         used_mask_raw = used_mask
         if used_mask_raw is None:
-            used_mask_raw = ((1 << bit_length) - 1).to_bytes((bit_length + 7) // 8, byteorder)
+            used_mask_raw = ((1 << bit_length) - 1).to_bytes((bit_length + 7) // 8, "big")
 
         if self.cursor_bit_position != 0:
-            tmp = int.from_bytes(used_mask_raw, byteorder)
+            tmp = int.from_bytes(used_mask_raw, "big")
             tmp <<= self.cursor_bit_position
-            used_mask_raw = tmp.to_bytes((self.cursor_bit_position + bit_length + 7) // 8,
-                                         byteorder)
+            used_mask_raw = tmp.to_bytes((self.cursor_bit_position + bit_length + 7) // 8, "big")
+
+        if not is_highlow_byte_order and base_data_type in [
+                DataType.A_INT32,
+                DataType.A_UINT32,
+        ]:
+            coded = coded[::-1]
+            used_mask_raw = used_mask_raw[::-1]
+
         self.cursor_bit_position = 0
         self.emplace_bytes(coded, obj_used_mask=used_mask_raw)
 
@@ -345,6 +354,7 @@ class EncodeState:
             result |= (value % 10) << shift
             shift += 4
             value //= 10
+
         return result
 
     @staticmethod
@@ -355,4 +365,5 @@ class EncodeState:
             result |= (value % 10) << shift
             shift += 8
             value //= 10
+
         return result
