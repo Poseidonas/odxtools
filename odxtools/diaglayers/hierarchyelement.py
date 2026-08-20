@@ -243,9 +243,17 @@ class HierarchyElement(DiagLayer):
         self._state_charts = NamedItemList(state_charts)
 
     def _get_parent_refs_sorted_by_priority(self, reverse: bool = False) -> Iterable[ParentRef]:
+
+        def get_inheritance_priority(layer: DiagLayer) -> int:
+            if layer is None:
+                # in non-strict mode, a parent layer ref sometimes
+                # cannot be resolved
+                return 0
+            return layer.variant_type.inheritance_priority
+
         return sorted(
             getattr(self.diag_layer_raw, "parent_refs", []),
-            key=lambda pr: pr.layer.variant_type.inheritance_priority,
+            key=lambda parent_ref: get_inheritance_priority(parent_ref.layer),
             reverse=reverse)
 
     def _compute_available_objects(
@@ -278,6 +286,11 @@ class HierarchyElement(DiagLayer):
         # populate the result dictionary with the inherited objects
         for parent_ref in self._get_parent_refs_sorted_by_priority(reverse=True):
             parent_dl = parent_ref.layer
+
+            if parent_dl is None:
+                # in non-strict mode, parent references sometimes
+                # cannot be resolved
+                continue
 
             # retrieve the set of short names of the objects which we
             # are not supposed to inherit

@@ -234,6 +234,10 @@ class DiagLayerRaw(IdentifiableElement):
         for dc_proxy in self.diag_comms_raw:
             if isinstance(dc_proxy, OdxLinkRef):
                 dc = odxlinks.resolve(dc_proxy, DiagComm)
+
+                if dc is None:
+                    # in non-strict mode, odxlinks.resolve() can return None
+                    continue
             else:
                 dc = dc_proxy
                 dc._resolve_odxlinks(odxlinks)

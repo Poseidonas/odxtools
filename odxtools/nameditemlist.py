@@ -52,6 +52,11 @@ class ItemAttributeList(list[T]):
 
         \return The name under which item is accessible
         """
+
+        if item is None:
+            odxraise(f"Tried to add a None object to ItemAttributeList")
+            return
+
         self._add_attribute_item(item)
 
         super().append(item)

@@ -82,7 +82,7 @@ class ProtocolRaw(HierarchyElementRaw):
         super()._resolve_snrefs(context)
 
         self._prot_stack = None
-        if self.prot_stack_snref is not None:
+        if self.prot_stack_snref is not None and self._comparam_spec is not None:
             self._prot_stack = resolve_snref(
                 self.prot_stack_snref,
                 self._comparam_spec.prot_stacks,

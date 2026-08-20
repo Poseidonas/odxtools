@@ -100,6 +100,10 @@ class DiagLayer:
             for import_ref in self.import_refs:
                 imported_dl = odxlinks.resolve(import_ref)
 
+                if imported_dl is None:
+                    # in non-strict mode, odxlinks.resolve() can fail...
+                    continue
+
                 # TODO: ensure that the imported diagnostic layer has
                 # not been referenced in any PARENT-REF of the current
                 # layer or any of its parents.
