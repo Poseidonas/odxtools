@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, cast
 from xml.etree import ElementTree
 
 from typing_extensions import override
@@ -63,12 +63,16 @@ class PhysicalConstantParameter(ParameterWithDOP):
 
     @override
     def _resolve_snrefs(self, context: SnRefContext) -> None:
+        self._physical_constant_value: ParameterValue
+
         super()._resolve_snrefs(context)
 
         dop = odxrequire(self.dop)
         if not isinstance(dop, DataObjectProperty):
             odxraise("The type of PHYS-CONST parameters must be a simple DOP")
+            self._physical_constant_value = cast(ParameterValue, None)
             return
+
         base_data_type = dop.physical_type.base_data_type
         self._physical_constant_value = base_data_type.from_string(self.physical_constant_value_raw)
 
@@ -80,6 +84,10 @@ class PhysicalConstantParameter(ParameterWithDOP):
                 f"Value for constant parameter `{self.short_name}` name can "
                 f"only be specified as {self.physical_constant_value!r} (is: {physical_value!r})",
                 EncodeError)
+
+        if self.dop is None:
+            # in non-strict mode, the DOP-REF might not be resolvable
+            return
 
         self.dop.encode_into_pdu(self.physical_constant_value, encode_state)
 

@@ -52,6 +52,12 @@ class ItemAttributeList(list[T]):
 
         \return The name under which item is accessible
         """
+
+        if not hasattr(item, "short_name"):
+            odxraise(f"Tried to add {type(item).__name__} object to ItemAttributeList which "
+                     f"does not feature .short_name.")
+            return
+
         self._add_attribute_item(item)
 
         super().append(item)

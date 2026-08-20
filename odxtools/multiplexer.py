@@ -85,8 +85,12 @@ class Multiplexer(ComplexDop):
             self.default_case._resolve_odxlinks(odxlinks)
 
         for mux_case in self.cases:
+            dop = self.switch_key.dop
+            if dop is None:
+                # the DOP can be None in non-strict mode
+                continue
             mux_case._mux_case_resolve_odxlinks(
-                odxlinks, key_physical_type=self.switch_key.dop.physical_type.base_data_type)
+                odxlinks, key_physical_type=dop.physical_type.base_data_type)
 
     @override
     def _resolve_snrefs(self, context: SnRefContext) -> None:
