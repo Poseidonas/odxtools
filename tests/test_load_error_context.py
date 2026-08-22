@@ -7,13 +7,15 @@ without searching the file by hand, which is what these cases used to require.
 import unittest
 from xml.etree import ElementTree
 
+from packaging.version import Version
+
 from odxtools.matchingparameter import MatchingParameter
 from odxtools.odxdoccontext import OdxDocContext
 from odxtools.odxlink import DocType, OdxDocFragment
 from odxtools.subcomponentparamconnector import SubComponentParamConnector
 
 doc_frags = (OdxDocFragment("test", DocType.CONTAINER),)
-context = OdxDocContext((2, 2, 0), doc_frags)
+context = OdxDocContext(Version("2.2.0"), doc_frags)
 
 
 class TestLoadErrorContext(unittest.TestCase):
