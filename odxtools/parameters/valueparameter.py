@@ -69,7 +69,7 @@ class ValueParameter(ParameterWithDOP):
             dop = odxrequire(self.dop)
             if not isinstance(dop, DataObjectProperty):
                 odxraise(f"VALUE parameter '{self.short_name}' specifies a physical "
-                         f"default value, but references {self._dop_description}; "
+                         f"default value, but references {self.dop_info}; "
                          f"this requires a simple DOP")
                 return
             base_data_type = dop.physical_type.base_data_type

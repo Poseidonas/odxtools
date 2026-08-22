@@ -70,7 +70,7 @@ class PhysicalConstantParameter(ParameterWithDOP):
         dop = odxrequire(self.dop)
         if not isinstance(dop, DataObjectProperty):
             odxraise(f"PHYS-CONST parameter '{self.short_name}' references "
-                     f"{self._dop_description}, but a simple DOP is required")
+                     f"{self.dop_info}, but a simple DOP is required")
             self._physical_constant_value = cast(ParameterValue, None)
             return
 
