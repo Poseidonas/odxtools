@@ -42,7 +42,7 @@ class ParameterWithDOP(Parameter):
             self.dop_ref.ref_id if self.dop_ref is not None else "<unspecified>")
         if self.dop is None:
             return f"unresolvable DOP '{name}'"
-        return f"{type(self.dop).__name__} DOP '{name}'"
+        return f"{self.dop.__class__.__name__} DOP '{name}'"
 
     @staticmethod
     @override
