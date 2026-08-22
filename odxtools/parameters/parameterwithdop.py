@@ -31,6 +31,19 @@ class ParameterWithDOP(Parameter):
 
         return self._dop
 
+    @property
+    def dop_info(self) -> str:
+        """Describe the referenced DOP for diagnostic messages.
+
+        Names the reference as it appears in the ODX file and, if it could be
+        resolved, the type of the object which it points to.
+        """
+        name = self.dop_snref if self.dop_snref is not None else (
+            self.dop_ref.ref_id if self.dop_ref is not None else "<unspecified>")
+        if self.dop is None:
+            return f"unresolvable DOP '{name}'"
+        return f"{type(self.dop).__name__} DOP '{name}'"
+
     @staticmethod
     @override
     def from_et(et_element: ElementTree.Element, context: OdxDocContext) -> "ParameterWithDOP":
