@@ -105,7 +105,7 @@ class EcuMemConnector(IdentifiableElement):
             x = odxlinks.resolve(ref)
             if not isinstance(x, (BaseVariant, EcuVariant)):
                 odxraise(f"LAYER-REF '{ref.ref_id}' of ECU-MEM-CONNECTOR "
-                         f"'{self.short_name}' references a {type(x).__name__}, but a "
+                         f"'{self.short_name}' references a {x.__class__.__name__}, but a "
                          f"base or ECU variant is required")
             tmp.append(x)
         self._layers = NamedItemList(tmp)
